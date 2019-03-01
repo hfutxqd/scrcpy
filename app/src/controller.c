@@ -32,6 +32,22 @@ void controller_destroy(struct controller *controller) {
 }
 
 SDL_bool controller_push_event(struct controller *controller, const struct control_event *event) {
+    LOGD("controller: %d", controller);
+    if (event->type == CONTROL_EVENT_TYPE_MOUSE) {
+        LOGD("push mouse event...");
+    } else if (event->type == CONTROL_EVENT_TYPE_SCROLL) {
+        LOGD("push scroll event...");
+
+    } else if (event->type == CONTROL_EVENT_TYPE_KEYCODE) {
+        LOGD("push key event...");
+
+    } else if (event->type == CONTROL_EVENT_TYPE_TEXT) {
+        LOGD("push text event...");
+        LOGD("%s", event->text_event.text);
+
+    } else if (event->type == CONTROL_EVENT_TYPE_COMMAND) {
+        LOGD("push command event...");
+    }
     SDL_bool res;
     mutex_lock(controller->mutex);
     SDL_bool was_empty = control_event_queue_is_empty(&controller->queue);

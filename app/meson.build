@@ -18,6 +18,7 @@ src = [
     'src/server.c',
     'src/str_util.c',
     'src/tiny_xpm.c',
+    'src/udpserver.c',
 ]
 
 if not get_option('crossbuild_windows')

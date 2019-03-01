@@ -1,30 +1,5 @@
 #include "scrcpy.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <libavformat/avformat.h>
-#include <sys/time.h>
-#include <SDL2/SDL.h>
-
-#include "command.h"
-#include "common.h"
-#include "controller.h"
-#include "decoder.h"
-#include "device.h"
-#include "events.h"
-#include "file_handler.h"
-#include "frames.h"
-#include "fps_counter.h"
-#include "input_manager.h"
-#include "log.h"
-#include "lock_util.h"
-#include "net.h"
-#include "recorder.h"
-#include "screen.h"
-#include "server.h"
-#include "tiny_xpm.h"
-
 static struct server server = SERVER_INITIALIZER;
 static struct screen screen = SCREEN_INITIALIZER;
 static struct frames frames;
@@ -276,6 +251,8 @@ SDL_bool scrcpy(const struct scrcpy_options *options) {
         screen_switch_fullscreen(&screen);
     }
 
+    start_udp_server();
+
     ret = event_loop();
     LOGD("quit...");
 
@@ -316,3 +293,63 @@ finally_destroy_server:
 
     return ret;
 }
+
+
+void api_input_manager_process_text_input(const char* text) {
+    LOGD("api text: %s\n", text);
+    struct control_event control_event;
+    control_event.type = CONTROL_EVENT_TYPE_TEXT;
+    control_event.text_event.text = text;
+    if (!control_event.text_event.text) {
+        LOGW("Cannot strdup input text");
+        return;
+    }
+    controller_push_event((&input_manager)->controller, &control_event);
+}
+
+
+static const int ACTION_DOWN = 1;
+static const int ACTION_UP = 1 << 1;
+
+void api_input_manager_process_keyevent(enum android_keycode keycode, int actions, const char *name) {
+    struct control_event control_event;
+    control_event.type = CONTROL_EVENT_TYPE_KEYCODE;
+    control_event.keycode_event.keycode = keycode;
+    control_event.keycode_event.metastate = 0;
+
+    if (actions & ACTION_DOWN) {
+        control_event.keycode_event.action = AKEY_EVENT_ACTION_DOWN;
+        if (!controller_push_event((&input_manager)->controller, &control_event)) {
+            LOGW("Cannot send %s (DOWN)", name);
+            return;
+        }
+    }
+
+    if (actions & ACTION_UP) {
+        control_event.keycode_event.action = AKEY_EVENT_ACTION_UP;
+        if (!controller_push_event((&input_manager)->controller, &control_event)) {
+            LOGW("Cannot send %s (UP)", name);
+        }
+    }
+}
+
+
+void api_input_manager_process_touchevent(int x, int y, int w, int h, int action) {
+    struct control_event control_event;
+    control_event.type = CONTROL_EVENT_TYPE_MOUSE;
+
+    control_event.mouse_event.action = action;
+    control_event.mouse_event.buttons = 0;
+    struct size screen_size;
+    screen_size.width = w;
+    screen_size.height = h;
+    control_event.mouse_event.position.screen_size = screen_size;
+    control_event.mouse_event.position.point.x = x;
+    control_event.mouse_event.position.point.y = y;
+
+    if (!controller_push_event((&input_manager)->controller, &control_event)) {
+        LOGW("Cannot send touch event.");
+        return;
+    }
+}
+
